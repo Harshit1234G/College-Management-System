@@ -80,5 +80,5 @@ You are good to go to use the software, you can create as many account you want.
 Project is: _complete_
 
 ## Note: 
-- This project is licensed under the MIT License. See the LICENSE file for details.
+- This project is licensed under the MIT License. See the LICENSE file (https://github.com/Harshit1234G/College-Management-System/blob/master/license.txt) for details.
 - If you want more detailed information about each function or class then look over the respective docstring.
