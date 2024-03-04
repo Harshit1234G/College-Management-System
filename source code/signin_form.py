@@ -160,7 +160,7 @@ class SigninForm(ctk.CTk):
         )
 
         self.submit_button.grid(
-            row= 7, 
+            row= 9, 
             column= 1,
             columnspan= 2,
             padx= 20,
@@ -179,7 +179,7 @@ class SigninForm(ctk.CTk):
         )
 
         self.create_account.grid(
-            row= 8, 
+            row= 10, 
             column= 1, 
             padx= (15, 0),
             sticky= 'w'
@@ -204,12 +204,13 @@ class SigninForm(ctk.CTk):
             rowspan= 80
         )
 
-    def create_account_gui(self) -> None:
+    def create_account_gui(self, admin= False) -> None:
         """
         Create account GUI.
         """
         self.geometry('600x430')
         self.email = ctk.StringVar()
+        self.smtp_stringvar = ctk.StringVar()
 
         self.header_label.configure(text= 'Create Account')
         self.forgot_password.destroy()
@@ -243,6 +244,39 @@ class SigninForm(ctk.CTk):
             columnspan= 2,
             sticky= 'w'
         )
+
+        if admin:
+            self.user_name.set('Admin')
+            self.user_name_widget.configure(state= 'disabled')
+
+            self.smtp_label = ctk.CTkLabel(
+                master= self,
+                text= 'SMTP key'
+            )
+
+            self.smtp_label.grid(
+                row= 7, 
+                column= 1, 
+                sticky= 'w', 
+                padx= 20, 
+                pady= (10, 0)
+            )
+
+            self.smtp_widget = ctk.CTkEntry(
+                master= self,
+                textvariable= self.smtp_stringvar,
+                width= 260,
+                border_color= '#72d2ff',
+                border_width= 3
+            )
+
+            self.smtp_widget.grid(
+                row= 8, 
+                column= 1,
+                padx= 20,
+                columnspan= 2,
+                sticky= 'w'
+            )
 
         #changing sigin to create account
         self.submit_button.configure(text= 'Create Account', command= self.__create_account)
@@ -307,6 +341,9 @@ class SigninForm(ctk.CTk):
         username = self.user_name.get()
         password = self.password.get()
         email = self.email.get()
+        smtp = self.smtp_stringvar.get()
+
+
 
         error_msg = ''
 
@@ -342,10 +379,10 @@ class SigninForm(ctk.CTk):
         with DatabaseConnector() as connector:
             connector.cursor.execute(
                 '''
-                INSERT INTO user(username, password, email)
-                VALUES (?, ?, ?);
+                INSERT INTO user(username, password, email, smtp_key)
+                VALUES (?, ?, ?, ?);
                 ''',
-                [username, password, email]
+                [username, password, email, smtp if smtp else None]
             )
 
             connector.db.commit()
@@ -353,11 +390,30 @@ class SigninForm(ctk.CTk):
         ShowInfo('Account Created', 'Sign in with the new account.')
         self.after(1000, self.sign_in_gui)
 
+    def __get_admin_details(self) -> tuple[str] | None:
+        with DatabaseConnector() as connector:
+            connector.cursor.execute(
+                '''
+                SELECT email, smtp_key
+                FROM user
+                WHERE username = "Admin";
+                '''
+            )
+
+            try:
+                return connector.cursor.fetchall()[0]
+
+            except IndexError:
+                ShowError("Admin not found.", "Create Admin Account.")
+                self.create_account_gui(admin= True)
+                return None
+
     #all funcs below are for forget password
     def forget_password_gui(self) -> None:
         """
         Creates the GUI for forget password.
         """
+
         #check user existence and send mail
         if not self.__check_user_existence_and_send_otp():
             return None
@@ -472,6 +528,13 @@ class SigninForm(ctk.CTk):
         """
         Generates an otp via __generate_otp and send it to the user's email after checking user existence.
         """
+
+        if smtp_details := self.__get_admin_details():
+            smtp_email, smtp_16_bit_key = smtp_details
+
+        else:
+            return None
+
         #getting user email
         with DatabaseConnector() as connector:
             connector.cursor.execute(
@@ -502,7 +565,7 @@ class SigninForm(ctk.CTk):
         
         #getting otp and sending mail to user
         self.otp = self.__generate_otp()
-        self.__send_email(username, email)
+        self.__send_email(username, email, smtp_email, smtp_16_bit_key)
 
         if resend:
             self.resend_otp.configure(text= "Didn't get the OTP? Resend it.", state= 'enabled')
@@ -518,11 +581,14 @@ class SigninForm(ctk.CTk):
     def __send_email(
         self, 
         username: str, 
-        receiver_email: str
+        receiver_email: str,
+        smtp_email: str,
+        smtp_16_bit_key: str
     ) -> None:
         """
         Used to send email.
         """
+
         #body of email
         email_body = f"""
 Dear {username},
@@ -533,25 +599,13 @@ OTP: {self.otp}
 
 If you did not request a password reset, please ignore this email. Your account security is important to us.
 
-Please do not share this OTP with anyone for security reasons. If you encounter any issues or did not request this password reset, contact our support team immediately at harshitnibm1@gmail.com.
+Please do not share this OTP with anyone for security reasons. If you encounter any issues or did not request this password reset, contact our support team immediately at {smtp_email}.
 
 Thank you for using College Management System.
 
 Best regards,
 Harshit Kumawat
 """
-
-        #get admin's email
-        with DatabaseConnector() as connector:
-            connector.cursor.execute(
-                '''
-                SELECT email
-                FROM user
-                WHERE username = "Admin";
-                '''
-            )
-
-            smtp_email = connector.cursor.fetchall()[0][0]
 
         #email configuration
         message = MIMEMultipart()
@@ -564,7 +618,6 @@ Harshit Kumawat
         smtp_server = "smtp.gmail.com"      #SMTP server
         smtp_port = 587                     #SMTP with TLS(transport layer security) has this port number
         smtp_username = smtp_email
-        smtp_16_bit_key = 'use your key here'
 
         try:
             #initialize SMTP (simple mail transfer protocol)
