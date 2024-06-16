@@ -54,7 +54,7 @@ These are some of the features that I would I like to add in future:
 2. Enhancing GUI, making it more attractive.
 
 ## Setup
-I'll add the link to download the setup file of my software.
+CMS_setup_1.1.exe: https://drive.google.com/file/d/1tQSOHejYGcnnmcqRCAvw7giWOZz89QIb/view?usp=sharing
 
 ## Usage
 ### Account creation:
